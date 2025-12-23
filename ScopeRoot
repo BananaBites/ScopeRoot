@@ -1,0 +1,59 @@
+#!/bin/bash
+
+# ScopeRoot - Run FastMCP server with ngrok tunnel
+# Usage: ScopeRoot [port]
+
+set -e
+
+# Get the directory where this script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Find an available port, default to 8000
+find_available_port() {
+    local port=${1:-8000}
+    while netstat -tuln 2>/dev/null | grep -q ":$port "; do
+        port=$((port + 1))
+    done
+    echo "$port"
+}
+
+# Cleanup function to kill child processes on exit
+cleanup() {
+    echo ""
+    echo "Shutting down..."
+    # Kill all child processes
+    kill $(jobs -p) 2>/dev/null || true
+    exit 0
+}
+
+# Set trap to cleanup on Ctrl-C
+trap cleanup SIGINT SIGTERM
+
+# Determine port (use argument or find available)
+if [ -n "$1" ]; then
+    PORT="$1"
+else
+    PORT=$(find_available_port 8000)
+fi
+
+echo "🚀 Starting ScopeRoot on port $PORT..."
+
+# Activate virtual environment if it exists
+if [ -d ".venv" ]; then
+    source .venv/bin/activate
+fi
+
+# Start mcp_fs.py server in the calling directory using Python from the venv
+python "$SCRIPT_DIR/mcp_fs.py" --port "$PORT" &
+SERVER_PID=$!
+
+# Give server a moment to start
+sleep 2
+
+# Start ngrok tunnel
+echo "🌐 Starting ngrok tunnel..."
+ngrok http "$PORT" &
+NGROK_PID=$!
+
+# Wait for interrupt
+wait

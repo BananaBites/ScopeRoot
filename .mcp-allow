@@ -1,0 +1,8 @@
+# allow these:
+README.md
+docs/**
+src/**
+tests/**
+
+# optionally allow configs:
+pyproject.toml
