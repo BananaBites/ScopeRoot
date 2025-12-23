@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# ScopeRoot - Run FastMCP server with ngrok tunnel
+# ScopeRoot - Run FastMCP server with SSH tunnel
 # Usage: ScopeRoot [port]
 
 set -e
@@ -50,10 +50,12 @@ SERVER_PID=$!
 # Give server a moment to start
 sleep 2
 
-# Start ngrok tunnel
-echo "🌐 Starting ngrok tunnel..."
-ngrok http "$PORT" &
-NGROK_PID=$!
+# Start SSH tunnel with localhost.run
+echo "🌐 Starting SSH tunnel with localhost.run..."
+echo "   Use the public URL shown below to connect to ChatGPT"
+echo ""
+ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -R 80:localhost:$PORT localhost.run &
+TUNNEL_PID=$!
 
 # Wait for interrupt
 wait

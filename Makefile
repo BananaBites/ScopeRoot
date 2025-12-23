@@ -2,7 +2,7 @@
 install:
 	python3 -m venv .venv
 	. .venv/bin/activate && \
-	pip install fastmcp pathspec
+	pip install fastmcp
 
 run:
 	. .venv/bin/activate && \
@@ -10,4 +10,5 @@ run:
 
 
 open:
-	ngrok http 8000
+	ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=3 \
+  		-R 80:localhost:8000 localhost.run
