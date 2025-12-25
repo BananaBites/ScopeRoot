@@ -74,9 +74,6 @@ README.md
 docs/**
 src/**
 tests/**
-
-# Specific config files
-pyproject.toml
 ```
 
 
@@ -103,3 +100,9 @@ If there's a syntax error:
 ## Test locally using this Repo
 
 see [./Makefile](./Makefile)
+
+
+## License
+
+This project is licensed under the
+[MIT License](https://opensource.org/licenses/MIT).

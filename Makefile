@@ -8,6 +8,9 @@ run:
 	. .venv/bin/activate && \
 	python mcp_fs.py
 
+test:
+	. .venv/bin/activate && \
+	python test_mcp_fs.py
 
 open:
 	ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=3 \

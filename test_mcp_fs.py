@@ -51,9 +51,6 @@ README.md
 docs/**
 src/**
 tests/**
-
-# optionally allow configs:
-pyproject.toml
 """
     (tmppath / ".mcp-allow").write_text(allow_content)
     
