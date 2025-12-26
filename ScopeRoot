@@ -2,11 +2,59 @@
 
 # ScopeRoot - Run FastMCP server with SSH tunnel
 # Usage: ScopeRoot [port]
+#        ScopeRoot --help
 
 set -e
 
 # Get the directory where this script is located (resolving symlinks)
 SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+
+# Show help
+show_help() {
+    cat << 'EOF'
+ScopeRoot - Share a directory with ChatGPT via MCP
+
+Usage: ScopeRoot [port]
+       ScopeRoot --help
+
+OPTIONS:
+  port              Specify a custom port (default: auto-detect available port)
+  --help, -h        Show this help message
+
+QUICK START:
+  1. Run ScopeRoot in your project directory:
+     ScopeRoot
+
+  2. Create a .mcp-allow file to control what ChatGPT can access
+
+  3. Copy the public URL from the output (you need to append '/mcp' later)
+        (e.g., https://xxx.localhost.run)
+
+  4. In ChatGPT, add a new MCP server (Developer mode required):
+     - Name: ScopeRoot
+     - MCP Server URL: https://xxx.localhost.run/mcp
+     - Authentication: No Auth
+
+  5. Tell ChatGPT the INSTRUCTIONS FOR CHATGPT shown below
+
+EOF
+    
+    # Get detailed help from mcp_fs.py
+    cd "$SCRIPT_DIR"
+    if [ ! -d ".venv" ]; then
+        echo "❌ Virtual environment not found."
+        echo "In $SCRIPT_DIR run 'make install' first"
+        exit 1
+    fi
+    . .venv/bin/activate
+    python "$SCRIPT_DIR/mcp_fs.py" --help 2>&1 | tail -n +2
+}
+
+# Check for help flag
+if [[ "$1" == "--help" || "$1" == "-h" ]]; then
+    show_help
+    exit 0
+fi
 
 # Find an available port, default to 8000
 find_available_port() {
@@ -21,7 +69,20 @@ find_available_port() {
 cleanup() {
     echo ""
     echo "Shutting down..."
-    # Kill all child processes
+    # Try graceful shutdown first
+    if [ -n "$SERVER_PID" ] && kill -0 $SERVER_PID 2>/dev/null; then
+        kill -TERM $SERVER_PID 2>/dev/null || true
+        # Wait up to 3 seconds for graceful shutdown
+        for i in {1..30}; do
+            if ! kill -0 $SERVER_PID 2>/dev/null; then
+                break
+            fi
+            sleep 0.1
+        done
+        # Force kill if still running
+        kill -9 $SERVER_PID 2>/dev/null || true
+    fi
+    # Kill remaining child processes
     kill $(jobs -p) 2>/dev/null || true
     exit 0
 }
@@ -38,10 +99,13 @@ fi
 
 echo "🚀 Starting ScopeRoot on port $PORT..."
 
-# Activate virtual environment if it exists
-if [ -d ".venv" ]; then
-    source .venv/bin/activate
+# Activate virtual environment (required)
+if [ ! -d "$SCRIPT_DIR/.venv" ]; then
+    echo "❌ Error: Virtual environment not found at $SCRIPT_DIR/.venv"
+    echo "In $SCRIPT_DIR run 'make install' first"
+    exit 1
 fi
+source "$SCRIPT_DIR/.venv/bin/activate"
 
 # Start mcp_fs.py server in the calling directory using Python from the venv
 python "$SCRIPT_DIR/mcp_fs.py" --port "$PORT" &

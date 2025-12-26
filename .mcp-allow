@@ -3,3 +3,6 @@ README.md
 docs/**
 src/**
 tests/**
+
+# note:
+# '.mcp-allow' itself can always be read but never be written by Chat-GPT

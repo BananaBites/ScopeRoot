@@ -60,6 +60,8 @@ def _load_allow_patterns() -> List[str]:
             # fnmatch patterns should be simple; no validation needed for basic syntax
         
         # Success: update cache
+        # Always include .mcp-allow for transparency about access rules
+        lines.append(".mcp-allow")
         _allow_patterns = lines
         _allow_file_mtime = current_mtime
         _last_error = None
@@ -148,7 +150,13 @@ def list_files(prefix: str = ".") -> List[str]:
 @mcp.tool
 def read_text(path: str, max_bytes: int = 200_000) -> str:
     """Read a whitelisted text file (UTF-8)."""
-    p = _safe_rel(path)
+    # Special case: .mcp-allow is always readable (for transparency about access rules)
+    # but never writable (for security - to prevent privilege escalation)
+    p = Path(path).resolve()
+    if p.name == ".mcp-allow":
+        p = ROOT / ".mcp-allow"
+    else:
+        p = _safe_rel(path)
     data = p.read_bytes()
     if len(data) > max_bytes:
         raise ValueError(f"File too large ({len(data)} bytes). Increase max_bytes if needed.")
@@ -158,14 +166,61 @@ def read_text(path: str, max_bytes: int = 200_000) -> str:
 def write_text(path: str, content: str, create: bool = True) -> str:
     """Write a whitelisted text file (UTF-8)."""
     p = _safe_rel(path)
+    # Prevent writing to .mcp-allow (read-only for security)
+    if p.name == ".mcp-allow" or p.as_posix() == ".mcp-allow":
+        raise ValueError(".mcp-allow is read-only for security reasons. Manual filesystem edits required.")
     if not p.exists() and not create:
         raise ValueError("File does not exist and create=False.")
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(content, encoding="utf-8")
     return "ok"
 
+def get_help_text() -> str:
+    """Return MCP-specific help text for use in ScopeRoot."""
+    return """
+.MCP-ALLOW CONFIGURATION:
+  Create a .mcp-allow file to control what ChatGPT can access.
+
+  Example .mcp-allow:
+    # allow these:
+    README.md
+    Makefile
+    docs/**
+    src/**
+    tests/**
+    # '.mcp-allow' itself can always be read but never be written by Chat-GPT
+
+PATTERN SYNTAX:
+  README.md         Match a specific file at root
+  docs/**           Match all files recursively under docs/
+  *.py              Match all .py files at root
+  **                Match all files and dirs, ok for scaffolding in empty directory
+
+SECURITY:
+  • .mcp-allow is read-only (ChatGPT cannot modify it)
+  • Hard-denied patterns: .env, *.pem, *id_rsa*, .git/**, .venv/**
+  • ChatGPT can only access files matching your .mcp-allow patterns
+  • Cannot escape the workspace root (.. traversal and symlink escapes blocked)
+
+INSTRUCTIONS FOR CHATGPT:
+  "I've set up ScopeRoot to share my project. You can access files defined in
+  .mcp-allow using shell-style glob patterns. Read .mcp-allow to see what you
+  can access. You can read and modify whitelisted files, but you cannot edit
+  .mcp-allow itself (manual filesystem edits required). If you need access to
+  additional locations, I'll update .mcp-allow."
+
+EDIT ACCESS:
+  If ChatGPT needs access to a new directory or file:
+  1. Update your .mcp-allow file on the filesystem
+  2. The changes are automatically detected and loaded
+"""
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Run FastMCP file server")
+    parser = argparse.ArgumentParser(
+        description="Run FastMCP file server for sharing project files with ChatGPT",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=get_help_text()
+    )
     parser.add_argument("--port", type=int, default=8000, help="Port to listen on (default: 8000)")
     args = parser.parse_args()
     
